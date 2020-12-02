@@ -11,7 +11,7 @@
  *
  *	This is a "pseudo" network driver to allow LAPB over Ethernet.
  *
- *	This driver can use any ethernet destination address, and can be 
+ *	This driver can use any ethernet destination address, and can be
  *	limited to accept frames from one dedicated ethernet card only.
  *
  *	History
@@ -70,7 +70,7 @@ static struct lapbethdev *lapbeth_get_x25_dev(struct net_device *dev)
 	struct lapbethdev *lapbeth;
 
 	list_for_each_entry_rcu(lapbeth, &lapbeth_devices, node) {
-		if (lapbeth->ethdev == dev) 
+		if (lapbeth->ethdev == dev)
 			return lapbeth;
 	}
 	return NULL;
@@ -207,6 +207,8 @@ static void lapbeth_data_transmit(struct net_device *ndev, struct sk_buff *skb)
 
 	skb->dev = dev = lapbeth->ethdev;
 
+	skb_reset_network_header(skb);
+
 	dev_hard_header(skb, dev, ETH_P_DEC, bcast_addr, NULL, 0);
 
 	dev_queue_xmit(skb);
@@ -334,7 +336,9 @@ static int lapbeth_new_device(struct net_device *dev)
 	 * then this driver prepends a length field of 2 bytes,
 	 * then the underlying Ethernet device prepends its own header.
 	 */
-	ndev->hard_header_len = -1 + 3 + 2 + dev->hard_header_len;
+	ndev->needed_headroom = -1 + 3 + 2 + dev->hard_header_len
+					   + dev->needed_headroom;
+	ndev->needed_tailroom = dev->needed_tailroom;
 
 	lapbeth = netdev_priv(ndev);
 	lapbeth->axdev = ndev;
@@ -390,10 +394,10 @@ static int lapbeth_device_event(struct notifier_block *this,
 		if (lapbeth_get_x25_dev(dev) == NULL)
 			lapbeth_new_device(dev);
 		break;
-	case NETDEV_DOWN:	
+	case NETDEV_DOWN:
 		/* ethernet device closed -> close LAPB interface */
 		lapbeth = lapbeth_get_x25_dev(dev);
-		if (lapbeth) 
+		if (lapbeth)
 			dev_close(lapbeth->axdev);
 		break;
 	case NETDEV_UNREGISTER:
